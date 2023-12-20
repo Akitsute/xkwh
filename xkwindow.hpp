@@ -8,7 +8,7 @@
 
 LRESULT CALLBACK WindowProc(HWND hwnd,UINT Message,WPARAM wParam,LPARAM lParam);
 
-LPCWSTR validateString(const std::string& string){
+wchar_t* convertString(const std::string& string){
    int length = MultiByteToWideChar(CP_UTF8,0,string.c_str(),-1,NULL,0);
 
    wchar_t* wideString = new wchar_t[length];
@@ -46,9 +46,13 @@ public:
 
       RegisterClassW(&windowClass);
 
-      hwnd = CreateWindowExW(0,L"XKWindowWin32",validateString(title),WS_OVERLAPPEDWINDOW | WS_VISIBLE | WS_CLIPSIBLINGS | WS_CLIPCHILDREN,
+      wchar_t* convertedTitle = convertString(title);
+
+      hwnd = CreateWindowExW(0,L"XKWindowWin32",convertedTitle,WS_OVERLAPPEDWINDOW | WS_VISIBLE | WS_CLIPSIBLINGS | WS_CLIPCHILDREN,
          insertX,insertY,scaleX,scaleY,NULL,NULL,GetModuleHandle(NULL),NULL
       );
+
+      delete[] convertedTitle;
 
       SetPropW(hwnd,L"WindowPointer",reinterpret_cast<HANDLE>(this));
       wglHDC = GetDC(hwnd);
@@ -61,25 +65,23 @@ public:
       int pixelFormat = ChoosePixelFormat(wglHDC,&pfd);
       SetPixelFormat(wglHDC,pixelFormat,&pfd);
 
+      cursorHandle = LoadCursor(NULL,IDC_ARROW);
+      SetCursor(cursorHandle);
+
       wglHGLRC = wglCreateContext(wglHDC);
+   }
+
+   void makeContext(){
       wglMakeCurrent(wglHDC,wglHGLRC);
+   }
 
-      glClearColor(0.0f,0.0f,0.0f,1.0f);
-      glClear(GL_COLOR_BUFFER_BIT);
-
-      glColor3f(1.0f,0.0f,0.5f);
-
-      glBegin(GL_QUADS);
-        glVertex2f(-0.5f,-0.5f);
-        glVertex2f(0.5f,-0.5f);
-        glVertex2f(0.5f,0.5f);
-        glVertex2f(-0.5f,0.5f);
-      glEnd();
-
+   void updateBuffers(){
       SwapBuffers(wglHDC);
+   }
 
+   void updateEvents(){
       MSG msg = {};
-      while(GetMessage(&msg,NULL,0,0)){
+      while(PeekMessageW(&msg,NULL,0,0,PM_REMOVE)){
          TranslateMessage(&msg);
          DispatchMessage(&msg);
       }
@@ -88,6 +90,8 @@ public:
    HWND hwnd;
    HDC wglHDC;
    HGLRC wglHGLRC;
+
+   HCURSOR cursorHandle;
 };
 
 LRESULT CALLBACK WindowProc(HWND hwnd,UINT Message,WPARAM wParam,LPARAM lParam){
@@ -96,6 +100,8 @@ LRESULT CALLBACK WindowProc(HWND hwnd,UINT Message,WPARAM wParam,LPARAM lParam){
    switch(Message){
       case WM_DESTROY:
          windowPointer->isOpen = 0;
+
+         DestroyCursor(windowPointer->cursorHandle);
 
          PostQuitMessage(0);
          return 0;
